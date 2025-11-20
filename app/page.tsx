@@ -1,15 +1,18 @@
+import Link from 'next/link'; // ایمپورت برای لینک دادن به صفحه جزئیات
 import { createCustomer, deleteCustomer } from '@/lib/actions';
 import { db } from '@/lib/db';
 import { customers, sales } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
 import { UserButton } from "@clerk/nextjs"; 
-import { Trash2 } from 'lucide-react';
+import { Trash2, ExternalLink } from 'lucide-react';
 
+// --- کامپوننت‌های ما ---
 import { SaleDialog } from '@/components/SaleDialog';
 import { InvoiceButton } from '@/components/InvoiceButton';
 import { EditCustomerDialog } from '@/components/EditCustomerDialog';
 import { MonthFilter } from '@/components/MonthFilter';
 
+// --- کامپوننت‌های UI ---
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,31 +21,28 @@ import { Label } from '@/components/ui/label';
 
 const formatPrice = (price: number) => new Intl.NumberFormat('fa-IR').format(price);
 
-// نکته مهم: در Next.js 15/16 اینترفیس باید به صورت Promise باشد
+// اینترفیس برای ورودی‌های صفحه در Next.js 16
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 export default async function HomePage({ searchParams }: Props) {
   
-  // ⚠️ تغییر اصلی اینجاست: باید searchParams را await کنیم
+  // 1. دریافت پارامترهای URL (ماه انتخاب شده)
   const params = await searchParams;
-
-  // 1. تشخیص ماه انتخابی
   const currentMonthStr = new Date().toLocaleDateString('fa-IR-u-nu-latn').split('/')[1];
   const selectedMonth = (params.month as string) || currentMonthStr;
 
-  // 2. دریافت تمام داده‌ها
+  // 2. دریافت تمام داده‌ها از دیتابیس
   const allCustomers = await db.select().from(customers).orderBy(desc(customers.createdAt));
   const allSales = await db.select().from(sales).orderBy(desc(sales.startDate));
 
   // 3. فیلتر کردن فروش‌ها بر اساس ماه انتخاب شده
   const monthlySales = allSales.filter(sale => {
     if (!sale.startDate) return false;
-    // تبدیل تاریخ میلادی دیتابیس به شمسی
+    // تبدیل تاریخ میلادی دیتابیس به شمسی و استخراج ماه
     const saleMonth = sale.startDate.toLocaleDateString('fa-IR-u-nu-latn').split('/')[1];
-    
-    // مقایسه عددی برای اطمینان (مثلا "08" با "8" برابر باشد)
+    // مقایسه عددی (مثلاً "08" با "8" یکی شود)
     return Number(saleMonth) === Number(selectedMonth);
   });
 
@@ -72,6 +72,7 @@ export default async function HomePage({ searchParams }: Props) {
 
         {/* --- آمار ماهانه --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* کارت درآمد */}
           <Card className="bg-gray-900 text-white shadow-lg border-none relative overflow-hidden">
             <div className="absolute top-0 left-0 p-4 opacity-10 text-6xl">💰</div>
             <CardContent className="p-6 flex flex-col gap-2 z-10">
@@ -83,6 +84,7 @@ export default async function HomePage({ searchParams }: Props) {
             </CardContent>
           </Card>
 
+          {/* کارت تعداد فروش */}
           <Card className="bg-blue-700 text-white shadow-lg border-none">
             <CardContent className="p-6 flex flex-col gap-2">
               <span className="text-blue-100 text-sm font-medium">فاکتورهای {currentMonthName}</span>
@@ -92,9 +94,10 @@ export default async function HomePage({ searchParams }: Props) {
             </CardContent>
           </Card>
 
+          {/* کارت کل مشتریان */}
            <Card className="bg-white text-gray-800 shadow-sm border border-gray-200">
             <CardContent className="p-6 flex flex-col gap-2">
-              <span className="text-gray-500 text-sm font-medium">کل مشتریان فعال</span>
+              <span className="text-gray-500 text-sm font-medium">کل مشتریان ثبت شده</span>
               <div className="text-3xl font-bold">
                 {allCustomers.length} <span className="text-lg font-normal">نفر</span>
               </div>
@@ -105,7 +108,7 @@ export default async function HomePage({ searchParams }: Props) {
         {/* --- محتوای اصلی --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* فرم ثبت (ثابت) */}
+          {/* فرم ثبت مشتری (ثابت) */}
           <div className="lg:col-span-4 xl:col-span-3">
             <Card className="shadow-md border-t-4 border-gray-800 sticky top-8">
               <CardHeader>
@@ -150,13 +153,10 @@ export default async function HomePage({ searchParams }: Props) {
               <div className="grid gap-3">
                 {allCustomers.map((customer) => {
                   
-                  // پیدا کردن خریدی که دقیقاً در ماه انتخاب شده انجام شده باشد
+                  // پیدا کردن خریدی که دقیقاً در ماه انتخاب شده انجام شده باشد (برای نمایش وضعیت این ماه)
                   const saleInThisMonth = monthlySales.find(s => s.customerId === customer.id);
                   
                   // پیدا کردن آخرین خرید کلی (بدون توجه به ماه) برای نمایش سابقه
-                  // نکته: ما sales را بر اساس تاریخ مرتب کردیم، پس اولین موردی که پیدا شه، آخریشه
-                  // اما اینجا باید از کل sales استفاده کنیم نه monthlySales
-                  // پس یه فیلتر جدا روی allSales میزنیم برای هر مشتری
                   const lastSaleEver = allSales.find(s => s.customerId === customer.id);
 
                   return (
@@ -164,8 +164,14 @@ export default async function HomePage({ searchParams }: Props) {
                       <CardContent className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         
                         <div className="flex-1 w-full md:w-auto">
+                          
+                          {/* --- اسم مشتری (لینک به صفحه جزئیات) --- */}
                           <div className="flex items-center gap-3">
-                            <h3 className="font-bold text-gray-900 text-lg">{customer.name}</h3>
+                            <Link href={`/customers/${customer.id}`} className="group-hover:text-blue-600 transition-colors flex items-center gap-2">
+                                <h3 className="font-bold text-gray-900 text-lg hover:underline">{customer.name}</h3>
+                                <ExternalLink size={14} className="opacity-0 group-hover:opacity-50 transition-opacity" />
+                            </Link>
+                            
                             <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded border">
                               {customer.phone}
                             </span>
@@ -183,18 +189,20 @@ export default async function HomePage({ searchParams }: Props) {
                                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
                                     {lastSaleEver 
                                         ? `آخرین خرید: ${lastSaleEver.startDate?.toLocaleDateString('fa-IR')}` 
-                                        : 'بدون خرید در این ماه'}
+                                        : 'بدون سابقه خرید'}
                                 </span>
                             )}
                           </div>
                         </div>
 
+                        {/* دکمه‌های عملیات */}
                         <div className="flex flex-wrap items-center justify-end gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0">
+                           
                            <EditCustomerDialog customer={customer} />
 
                            <form action={deleteCustomer}>
                              <input type="hidden" name="id" value={customer.id} />
-                             <Button variant="ghost" size="icon" type="submit" className="text-gray-400 hover:text-red-600 hover:bg-red-50">
+                             <Button variant="ghost" size="icon" type="submit" className="text-gray-400 hover:text-red-600 hover:bg-red-50" title="حذف مشتری">
                                <Trash2 size={18} />
                              </Button>
                            </form>

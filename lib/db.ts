@@ -1,8 +1,8 @@
-// lib/db.ts
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
+import * as schema from './schema'; // 1. این خط اضافه شد
 
-// این آدرس را بعدا در فایل .env قرار می‌دهیم
 const sql = neon(process.env.DATABASE_URL!);
 
-export const db = drizzle(sql);
+// 2. اسکیما را به عنوان آپشن دوم پاس می‌دهیم
+export const db = drizzle(sql, { schema });
