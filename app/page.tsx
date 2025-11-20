@@ -4,11 +4,14 @@ import { customers, sales } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
 import { UserButton } from "@clerk/nextjs"; 
 
-// --- کامپوننت‌های ما ---
+// --- Components ---
 import { MonthFilter } from '@/components/MonthFilter';
-import { CustomerList } from '@/components/CustomerList'; // <--- ایمپورت جدید
+import { CustomerList } from '@/components/CustomerList';
+import { RevenueChart } from '@/components/RevenueChart';
+import { ExcelExportButton } from '@/components/ExcelExportButton';
+import { ModeToggle } from '@/components/ModeToggle';
 
-// --- کامپوننت‌های UI ---
+// --- UI ---
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,11 +30,9 @@ export default async function HomePage({ searchParams }: Props) {
   const currentMonthStr = new Date().toLocaleDateString('fa-IR-u-nu-latn').split('/')[1];
   const selectedMonth = (params.month as string) || currentMonthStr;
 
-  // دریافت داده‌ها
   const allCustomers = await db.select().from(customers).orderBy(desc(customers.createdAt));
   const allSales = await db.select().from(sales).orderBy(desc(sales.startDate));
 
-  // فیلتر فروش‌های این ماه (برای محاسبه آمار و پاس دادن به لیست)
   const monthlySales = allSales.filter(sale => {
     if (!sale.startDate) return false;
     const saleMonth = sale.startDate.toLocaleDateString('fa-IR-u-nu-latn').split('/')[1];
@@ -40,30 +41,33 @@ export default async function HomePage({ searchParams }: Props) {
 
   const monthlyRevenue = monthlySales.reduce((acc, sale) => acc + sale.amount, 0);
   const monthlySalesCount = monthlySales.length;
-
   const monthNames = ["", "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
   const currentMonthName = monthNames[Number(selectedMonth)];
 
   return (
-    <div className="min-h-screen p-4 md:p-8" dir="rtl">
+    <div className="min-h-screen p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* --- هدر --- */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border">
+        {/* --- Header --- */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border dark:border-gray-800">
           <div className="flex items-center gap-4">
              <UserButton showName />
-             <div className="h-8 w-[1px] bg-gray-200 hidden md:block"></div>
-             <h1 className="text-xl md:text-2xl font-bold text-gray-800">پنل مدیریت فروش</h1>
+             <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-700 hidden md:block"></div>
+             <h1 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100">پنل مدیریت فروش</h1>
           </div>
-          <MonthFilter />
+          
+          <div className="flex items-center gap-3">
+            <ModeToggle />
+            <MonthFilter />
+          </div>
         </div>
 
-        {/* --- آمار --- */}
+        {/* --- Stats Cards --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-gray-900 text-white shadow-lg border-none relative overflow-hidden">
-            <div className="absolute top-0 left-0 p-4 opacity-10 text-6xl">💰</div>
-            <CardContent className="p-6 flex flex-col gap-2 z-10">
-              <span className="text-gray-300 text-sm font-medium">درآمد در {currentMonthName}</span>
+          <Card className="bg-gray-900 dark:bg-emerald-950 text-white shadow-lg border-none relative overflow-hidden">
+            <div className="absolute top-0 left-0 p-4 opacity-20 text-6xl grayscale-0">💰</div>
+            <CardContent className="p-6 flex flex-col gap-2 z-10 relative">
+              <span className="text-gray-300 dark:text-emerald-200 text-sm font-medium">درآمد در {currentMonthName}</span>
               <div className="text-3xl font-bold flex items-end gap-2 text-emerald-400">
                 {formatPrice(monthlyRevenue)} 
                 <span className="text-lg font-normal text-white opacity-80">تومان</span>
@@ -71,7 +75,7 @@ export default async function HomePage({ searchParams }: Props) {
             </CardContent>
           </Card>
 
-          <Card className="bg-blue-700 text-white shadow-lg border-none">
+          <Card className="bg-blue-700 dark:bg-blue-900 text-white shadow-lg border-none">
             <CardContent className="p-6 flex flex-col gap-2">
               <span className="text-blue-100 text-sm font-medium">فاکتورهای {currentMonthName}</span>
               <div className="text-3xl font-bold">
@@ -80,9 +84,9 @@ export default async function HomePage({ searchParams }: Props) {
             </CardContent>
           </Card>
 
-           <Card className="bg-white text-gray-800 shadow-sm border border-gray-200">
+           <Card className="bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-sm border border-gray-200 dark:border-gray-700">
             <CardContent className="p-6 flex flex-col gap-2">
-              <span className="text-gray-500 text-sm font-medium">کل مشتریان ثبت شده</span>
+              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">کل مشتریان</span>
               <div className="text-3xl font-bold">
                 {allCustomers.length} <span className="text-lg font-normal">نفر</span>
               </div>
@@ -90,30 +94,31 @@ export default async function HomePage({ searchParams }: Props) {
           </Card>
         </div>
 
-        {/* --- محتوای اصلی --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* --- Form & Chart (اصلاح شده: نمودار ۲/۳ و فرم ۱/۳) --- */}
+        {/* تغییر: grid-cols-3 برای تقسیم به سه قسمت */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           
-          {/* فرم ثبت (ثابت) */}
-          <div className="lg:col-span-4 xl:col-span-3">
-            <Card className="shadow-md border-t-4 border-gray-800 sticky top-8">
+          {/* 1. فرم ثبت مشتری (سمت راست - 1 قسمت) */}
+          <div className="h-full lg:col-span-1">
+            <Card className="shadow-md border-t-4 border-gray-800 dark:border-gray-600 dark:bg-gray-900 h-full flex flex-col">
               <CardHeader>
-                <CardTitle className="text-lg font-bold text-gray-800">ثبت مشتری جدید</CardTitle>
+                <CardTitle className="text-lg font-bold text-gray-800 dark:text-gray-100">ثبت مشتری جدید</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-1 flex flex-col justify-center">
                 <form action={createCustomer} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">نام و نام خانوادگی</Label>
-                    <Input name="name" id="name" placeholder="مثلاً: علی محمدی" required className="bg-gray-50" />
+                    <Label className="dark:text-gray-300">نام و نام خانوادگی</Label>
+                    <Input name="name" required className="bg-gray-50 dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">شماره موبایل</Label>
-                    <Input name="phone" id="phone" type="tel" placeholder="0912..." required className="bg-gray-50 text-left dir-ltr" />
+                    <Label className="dark:text-gray-300">شماره موبایل</Label>
+                    <Input name="phone" type="tel" required className="bg-gray-50 dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-white text-left dir-ltr placeholder:text-gray-400" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="description">توضیحات</Label>
-                    <Textarea name="description" id="description" placeholder="مدل گوشی / توضیحات..." className="bg-gray-50" />
+                    <Label className="dark:text-gray-300">توضیحات</Label>
+                    <Textarea name="description" className="bg-gray-50 dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400" />
                   </div>
-                  <Button type="submit" className="w-full bg-gray-900 hover:bg-black text-white">
+                  <Button type="submit" className="w-full bg-gray-900 hover:bg-black dark:bg-gray-700 dark:hover:bg-gray-600 text-white mt-2">
                     افزودن
                   </Button>
                 </form>
@@ -121,24 +126,31 @@ export default async function HomePage({ searchParams }: Props) {
             </Card>
           </div>
 
-          {/* لیست مشتریان (با قابلیت سرچ) */}
-          <div className="lg:col-span-8 xl:col-span-9 space-y-4">
-            <div className="flex justify-between items-center mb-2 border-b pb-2">
-                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          {/* 2. نمودار فروش (سمت چپ - 2 قسمت) */}
+          {/* تغییر: lg:col-span-2 برای گرفتن دو قسمت */}
+          <div className="h-full lg:col-span-2">
+            <RevenueChart sales={allSales} />
+          </div>
+
+        </div>
+
+        {/* --- Customer List --- */}
+        <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-2 border-b dark:border-gray-800 pb-4 gap-4">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                   <span className="w-2 h-6 rounded bg-blue-600 inline-block"></span>
-                  وضعیت مشتریان در {currentMonthName}
+                  وضعیت مشتریان
                 </h2>
+                <ExcelExportButton customers={allCustomers} sales={allSales} />
             </div>
             
-            {/* کامپوننت لیست که ساختیم رو اینجا صدا می‌زنیم */}
             <CustomerList 
               customers={allCustomers}
               allSales={allSales}
               monthlySales={monthlySales}
             />
-            
-          </div>
         </div>
+
       </div>
     </div>
   );
