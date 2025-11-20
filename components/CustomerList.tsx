@@ -9,11 +9,10 @@ import { Trash2, ExternalLink, Search, Copy, AlertTriangle, XCircle, Banknote, C
 import { SaleDialog } from '@/components/SaleDialog';
 import { InvoiceButton } from '@/components/InvoiceButton';
 import { EditCustomerDialog } from '@/components/EditCustomerDialog';
-import { deleteCustomer, settleDebt } from '@/lib/actions'; // اکشن تسویه حساب
+import { deleteCustomer, settleDebt } from '@/lib/actions';
 
 const formatPrice = (price: number) => new Intl.NumberFormat('fa-IR').format(price);
 
-// --- تعریف تایپ‌های دقیق ---
 type Customer = {
   id: number;
   name: string;
@@ -30,7 +29,7 @@ type Sale = {
   endDate: Date | null;
   duration: number;
   tokenCode: string | null;
-  isPaid: boolean | null; // فیلد وضعیت پرداخت
+  isPaid: boolean | null;
 };
 
 interface CustomerListProps {
@@ -42,20 +41,27 @@ interface CustomerListProps {
 export function CustomerList({ customers, allSales, monthlySales }: CustomerListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // فیلتر جستجو
   const filteredCustomers = customers.filter((customer) => 
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     customer.phone.includes(searchTerm)
   );
 
-  // کپی متن تمدید
-  const handleCopyRenewal = (customerName: string, amount: number) => {
-    const text = `سلام ${customerName} عزیز 🌹\nاشتراک سرویس اینترنت شما به پایان رسیده.\nجهت تمدید مبلغ ${formatPrice(amount)} تومان را واریز کنید.\nبا تشکر`;
+  // --- تابع هوشمند کپی متن ---
+  const handleCopyRenewal = (customerName: string, amount: number, isDebt: boolean) => {
+    let text = '';
+
+    if (isDebt) {
+        // متن برای مشتری بدهکار
+        text = `سلام ${customerName} عزیز 🌹\nسرویس اینترنت شما فعال شده اما مبلغ آن هنوز تسویه نشده است.\nلطفاً جهت تکمیل سفارش، مبلغ ${formatPrice(amount)} تومان را واریز کنید.\nبا تشکر 🙏`;
+    } else {
+        // متن برای تمدید عادی
+        text = `سلام ${customerName} عزیز 🌹\nاشتراک سرویس اینترنت شما به پایان رسیده است.\nجهت تمدید، لطفاً مبلغ ${formatPrice(amount)} تومان را واریز کنید.\nسپاس از همراهی شما ❤️`;
+    }
+
     navigator.clipboard.writeText(text);
-    alert('متن تمدید کپی شد!');
+    alert(isDebt ? 'متن یادآوری بدهی کپی شد!' : 'متن تمدید اشتراک کپی شد!');
   };
 
-  // محاسبه وضعیت انقضا
   const getStatus = (lastSale: Sale | undefined) => {
     if (!lastSale || !lastSale.endDate) return 'none';
     const today = new Date();
@@ -71,7 +77,7 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
   return (
     <div className="space-y-4">
       
-      {/* --- نوار جستجو --- */}
+      {/* نوار جستجو */}
       <div className="flex items-center gap-2 mb-6">
         <div className="relative w-full">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -87,7 +93,7 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
         </div>
       </div>
 
-      {/* --- لیست مشتریان --- */}
+      {/* لیست کارت‌ها */}
       {filteredCustomers.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-gray-400">
           مشتری با این مشخصات پیدا نشد.
@@ -99,30 +105,24 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
             const saleInThisMonth = monthlySales.find(s => s.customerId === customer.id);
             const lastSaleEver = allSales.find(s => s.customerId === customer.id);
             
-            // 1. بررسی بدهکاری: خرید کرده ولی پول نداده
+            // تشخیص بدهکاری
             const isDebt = saleInThisMonth && saleInThisMonth.isPaid === false;
-
-            // 2. بررسی انقضا
             const status = getStatus(lastSaleEver);
 
-            // 3. تعیین رنگ‌بندی کارت
+            // استایل‌دهی کارت
             let borderClass = 'border-gray-100 hover:shadow-md dark:border-gray-800';
             let bgClass = 'bg-white dark:bg-gray-900';
             
             if (isDebt) {
-                // حالت بدهکار (نارنجی)
                 borderClass = 'border-orange-400 border-l-4 shadow-sm dark:border-orange-500';
                 bgClass = 'bg-orange-50 dark:bg-orange-950/30';
             } else if (status === 'expired') {
-                // منقضی شده (قرمز)
                 borderClass = 'border-red-300 shadow-sm dark:border-red-800';
                 bgClass = 'bg-red-50 dark:bg-red-950/20';
             } else if (status === 'warning') {
-                // هشدار انقضا (زرد)
                 borderClass = 'border-yellow-400 shadow-sm dark:border-yellow-600';
                 bgClass = 'bg-yellow-50 dark:bg-yellow-950/20';
             } else if (saleInThisMonth) {
-                // عادی (سبز کمرنگ)
                 borderClass = 'border-emerald-200 dark:border-emerald-800';
                 bgClass = 'bg-emerald-50/30 dark:bg-emerald-950/20';
             }
@@ -132,7 +132,6 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
                 <CardContent className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   
                   <div className="flex-1 w-full md:w-auto">
-                    {/* لینک به صفحه جزئیات */}
                     <div className="flex items-center gap-3">
                       <Link href={`/customers/${customer.id}`} className="group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2">
                           <h3 className="font-bold text-gray-900 dark:text-gray-100 text-lg hover:underline">{customer.name}</h3>
@@ -144,17 +143,15 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
                       </span>
                     </div>
                     
-                    {/* نمایش وضعیت‌ها */}
+                    {/* وضعیت‌ها */}
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       
-                      {/* بدهکاری */}
                       {isDebt && (
                           <span className="text-xs text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900 px-2 py-1 rounded font-bold flex items-center gap-1 animate-pulse">
                               <AlertTriangle size={14} /> در انتظار پرداخت
                           </span>
                       )}
 
-                      {/* انقضا (اگر بدهکار نباشد یا برای اطلاع‌رسانی) */}
                       {!isDebt && status === 'expired' && (
                           <span className="text-xs text-red-700 bg-red-100 px-2 py-1 rounded font-bold flex items-center gap-1">
                               <XCircle size={14} /> منقضی شده
@@ -171,7 +168,6 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
                           </span>
                       )}
 
-                      {/* تاریخ پایان */}
                       <span className="text-xs text-gray-500 dark:text-gray-400 opacity-80">
                           {lastSaleEver 
                               ? `پایان: ${lastSaleEver.endDate?.toLocaleDateString('fa-IR')}` 
@@ -180,10 +176,10 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
                     </div>
                   </div>
 
-                  {/* --- دکمه‌های عملیات --- */}
+                  {/* دکمه‌ها */}
                   <div className="flex flex-wrap items-center justify-end gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-gray-200/50 dark:border-gray-700">
                       
-                      {/* دکمه تسویه حساب (فقط برای بدهکارها) */}
+                      {/* دکمه تسویه (مخصوص بدهکاران) */}
                       {isDebt && (
                         <form action={settleDebt}>
                             <input type="hidden" name="saleId" value={saleInThisMonth.id} />
@@ -192,32 +188,34 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
                                 size="sm" 
                                 type="submit"
                                 className="h-8 bg-green-600 text-white hover:bg-green-700 border-green-600 animate-bounce shadow-lg"
-                                title="دریافت پول و تسویه"
+                                title="دریافت پول"
                             >
                                 <Banknote size={16} className="mr-1" /> دریافت شد
                             </Button>
                         </form>
                       )}
 
-                      {/* کپی متن تمدید */}
+                      {/* دکمه کپی پیام (هوشمند) */}
                       {lastSaleEver && (
                           <Button 
                             variant="outline" 
                             size="sm" 
                             className="h-8 text-xs gap-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-100 text-gray-700 dark:text-gray-300"
-                            onClick={() => handleCopyRenewal(customer.name, lastSaleEver.amount)}
-                            title="کپی پیام تمدید"
+                            onClick={() => handleCopyRenewal(
+                                customer.name, 
+                                lastSaleEver.amount, 
+                                isDebt ? true : false // وضعیت بدهکاری را پاس می‌دهیم
+                            )}
+                            title={isDebt ? "کپی یادآوری بدهی" : "کپی پیام تمدید"}
                           >
-                             <Copy size={12} /> پیام
+                             <Copy size={12} /> {isDebt ? 'پیام بدهی' : 'پیام تمدید'}
                           </Button>
                       )}
 
                       <div className="w-[1px] h-6 bg-gray-300 dark:bg-gray-700 mx-1 hidden sm:block"></div>
 
-                      {/* ویرایش مشتری */}
                       <EditCustomerDialog customer={customer} />
 
-                      {/* حذف مشتری */}
                       <form action={deleteCustomer}>
                         <input type="hidden" name="id" value={customer.id} />
                         <Button variant="ghost" size="icon" type="submit" className="text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="حذف">
@@ -225,7 +223,6 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
                         </Button>
                       </form>
 
-                      {/* دانلود فاکتور (با ارسال وضعیت پرداخت) */}
                       {saleInThisMonth && (
                         <InvoiceButton 
                           data={{
@@ -235,12 +232,11 @@ export function CustomerList({ customers, allSales, monthlySales }: CustomerList
                             date: saleInThisMonth.startDate ? saleInThisMonth.startDate.toLocaleDateString('fa-IR') : '-',
                             description: saleInThisMonth.tokenCode || 'سرویس اینترنت',
                             invoiceNumber: saleInThisMonth.id,
-                            isPaid: saleInThisMonth.isPaid // ارسال وضعیت به PDF
+                            isPaid: saleInThisMonth.isPaid
                           }}
                         />
                       )}
 
-                      {/* ثبت فروش جدید */}
                       <SaleDialog customerId={customer.id} customerName={customer.name} />
                   </div>
 
