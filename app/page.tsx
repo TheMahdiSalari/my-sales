@@ -51,7 +51,16 @@ export default async function HomePage({ searchParams }: Props) {
         {/* --- Header --- */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border dark:border-gray-800">
           <div className="flex items-center gap-4">
-             <UserButton showName />
+             {/* اصلاح رنگ متن یوزر برای حالت دارک */}
+             <UserButton 
+               showName 
+               appearance={{
+                 elements: {
+                   userButtonOuterIdentifier: "text-gray-900 dark:text-white font-bold text-base"
+                 }
+               }}
+             />
+             
              <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-700 hidden md:block"></div>
              <h1 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100">پنل مدیریت فروش</h1>
           </div>
@@ -94,8 +103,7 @@ export default async function HomePage({ searchParams }: Props) {
           </Card>
         </div>
 
-        {/* --- Form & Chart (اصلاح شده: نمودار ۲/۳ و فرم ۱/۳) --- */}
-        {/* تغییر: grid-cols-3 برای تقسیم به سه قسمت */}
+        {/* --- Form & Chart --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           
           {/* 1. فرم ثبت مشتری (سمت راست - 1 قسمت) */}
@@ -127,7 +135,6 @@ export default async function HomePage({ searchParams }: Props) {
           </div>
 
           {/* 2. نمودار فروش (سمت چپ - 2 قسمت) */}
-          {/* تغییر: lg:col-span-2 برای گرفتن دو قسمت */}
           <div className="h-full lg:col-span-2">
             <RevenueChart sales={allSales} />
           </div>
