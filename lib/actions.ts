@@ -5,6 +5,7 @@ import { customers } from '@/lib/schema';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { sales } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 export async function createCustomer(formData: FormData) {
   // 1. دریافت اطلاعات از فرم
@@ -50,4 +51,30 @@ export async function createSale(formData: FormData) {
 
   revalidatePath('/');
   console.log("فروش ثبت شد");
+}
+// 1. ویرایش مشتری
+export async function updateCustomer(formData: FormData) {
+  const id = Number(formData.get('id'));
+  const name = formData.get('name') as string;
+  const phone = formData.get('phone') as string;
+  const description = formData.get('description') as string;
+
+  await db.update(customers)
+    .set({ name, phone, description })
+    .where(eq(customers.id, id));
+
+  revalidatePath('/');
+}
+
+// 2. حذف مشتری (و تمام فروش‌هایش)
+export async function deleteCustomer(formData: FormData) {
+  const id = Number(formData.get('id'));
+
+  // اول فروش‌های این مشتری رو پاک می‌کنیم (چون بهش وصلن)
+  await db.delete(sales).where(eq(sales.customerId, id));
+  
+  // بعد خود مشتری رو پاک می‌کنیم
+  await db.delete(customers).where(eq(customers.id, id));
+
+  revalidatePath('/');
 }

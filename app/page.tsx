@@ -1,14 +1,16 @@
-import { createCustomer } from '@/lib/actions';
+import { createCustomer, deleteCustomer } from '@/lib/actions';
 import { db } from '@/lib/db';
 import { customers, sales } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
-import { UserButton } from "@clerk/nextjs"; // دکمه پروفایل و خروج
+import { UserButton } from "@clerk/nextjs"; 
+import { Trash2 } from 'lucide-react'; // آیکون سطل آشغال
 
-// کامپوننت‌های کاستوم ما
+// --- کامپوننت‌های ما ---
 import { SaleDialog } from '@/components/SaleDialog';
 import { InvoiceButton } from '@/components/InvoiceButton';
+import { EditCustomerDialog } from '@/components/EditCustomerDialog';
 
-// کامپوننت‌های UI
+// --- کامپوننت‌های UI ---
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,32 +24,31 @@ const formatPrice = (price: number) => {
 
 export default async function HomePage() {
   
-  // 1. دریافت داده‌ها از دیتابیس
+  // 1. دریافت داده‌ها
   const allCustomers = await db.select().from(customers).orderBy(desc(customers.createdAt));
   const allSales = await db.select().from(sales).orderBy(desc(sales.startDate));
 
-  // 2. محاسبات آماری
+  // 2. آمار کلی
   const totalRevenue = allSales.reduce((acc, sale) => acc + sale.amount, 0);
   const totalSalesCount = allSales.length;
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen p-4 md:p-8" dir="rtl">
+      <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* --- هدر و پروفایل کاربری --- */}
+        {/* --- هدر --- */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border">
           <div className="flex items-center gap-4">
-             {/* دکمه دایره‌ای تنظیمات اکانت و خروج */}
              <UserButton showName />
              <div className="h-8 w-[1px] bg-gray-200 hidden md:block"></div>
-             <h1 className="text-xl md:text-2xl font-bold text-gray-800">پنل مدیریت فروش 🚀</h1>
+             <h1 className="text-xl md:text-2xl font-bold text-gray-800">پنل مدیریت مشتریان 🚀</h1>
           </div>
-          <div className="text-sm text-gray-500">
-            امروز: {new Date().toLocaleDateString('fa-IR')}
+          <div className="text-sm text-gray-500 font-medium">
+             {new Date().toLocaleDateString('fa-IR', { dateStyle: 'full' })}
           </div>
         </div>
 
-        {/* --- کارت‌های گزارش آماری --- */}
+        {/* --- آمار --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-emerald-600 text-white shadow-lg border-none">
             <CardContent className="p-6 flex flex-col gap-2">
@@ -70,7 +71,7 @@ export default async function HomePage() {
 
            <Card className="bg-white text-gray-800 shadow-sm border border-gray-200">
             <CardContent className="p-6 flex flex-col gap-2">
-              <span className="text-gray-500 text-sm font-medium">کل مشتریان</span>
+              <span className="text-gray-500 text-sm font-medium">مشتریان فعال</span>
               <div className="text-3xl font-bold">
                 {allCustomers.length} <span className="text-lg font-normal">نفر</span>
               </div>
@@ -79,10 +80,10 @@ export default async function HomePage() {
         </div>
 
         {/* --- محتوای اصلی --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* ستون راست: فرم ثبت مشتری */}
-          <div className="lg:col-span-1">
+          {/* ستون راست: فرم ثبت (سایز کوچکتر) */}
+          <div className="lg:col-span-4 xl:col-span-3">
             <Card className="shadow-md border-t-4 border-gray-800 sticky top-8">
               <CardHeader>
                 <CardTitle className="text-lg font-bold text-gray-800">ثبت مشتری جدید</CardTitle>
@@ -91,74 +92,95 @@ export default async function HomePage() {
                 <form action={createCustomer} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">نام و نام خانوادگی</Label>
-                    <Input name="name" id="name" placeholder="مثلاً: رضا علوی" required className="bg-gray-50" />
+                    <Input name="name" id="name" placeholder="مثلاً: علی محمدی" required className="bg-gray-50" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">شماره موبایل</Label>
                     <Input name="phone" id="phone" type="tel" placeholder="0912..." required className="bg-gray-50 text-left dir-ltr" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="description">توضیحات / مدل دستگاه</Label>
-                    <Textarea name="description" id="description" placeholder="..." className="bg-gray-50" />
+                    <Label htmlFor="description">توضیحات</Label>
+                    <Textarea name="description" id="description" placeholder="مدل گوشی / توضیحات..." className="bg-gray-50" />
                   </div>
-                  <Button type="submit" className="w-full bg-gray-900 hover:bg-black text-white transition-all">
-                    افزودن مشتری
+                  <Button type="submit" className="w-full bg-gray-900 hover:bg-black text-white">
+                    افزودن به لیست
                   </Button>
                 </form>
               </CardContent>
             </Card>
           </div>
 
-          {/* ستون چپ: لیست مشتریان */}
-          <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
+          {/* ستون چپ: لیست مشتریان (سایز بزرگتر) */}
+          <div className="lg:col-span-8 xl:col-span-9 space-y-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="w-2 h-6 rounded bg-blue-600 inline-block"></span>
               لیست مشتریان
             </h2>
             
             {allCustomers.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200 text-gray-400">
-                <p>هنوز هیچ مشتری‌ای ثبت نشده است.</p>
+                هنوز مشتری ثبت نشده است.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid gap-3">
                 {allCustomers.map((customer) => {
-                  // پیدا کردن آخرین خرید مشتری
                   const lastSale = allSales.find(s => s.customerId === customer.id);
 
                   return (
-                    <Card key={customer.id} className="group hover:shadow-lg transition-all duration-300 border border-gray-100 overflow-hidden">
-                      <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <Card key={customer.id} className="group hover:shadow-md transition-all duration-200 border border-gray-100">
+                      <CardContent className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         
                         {/* اطلاعات مشتری */}
-                        <div className="flex-1 w-full">
-                          <div className="flex justify-between sm:justify-start items-center gap-3 mb-1">
+                        <div className="flex-1 w-full md:w-auto">
+                          <div className="flex items-center gap-3">
                             <h3 className="font-bold text-gray-900 text-lg">{customer.name}</h3>
-                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded border">
+                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded border">
                               {customer.phone}
                             </span>
                           </div>
                           
-                          {lastSale ? (
-                             <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-600 font-medium mt-2 bg-emerald-50 w-fit px-2 py-1 rounded">
-                               <span>✅ خرید آخر: {formatPrice(lastSale.amount)} ت</span>
-                               <span className="text-gray-300">|</span>
-                               <span>{lastSale.startDate ? lastSale.startDate.toLocaleDateString('fa-IR') : ''}</span>
-                             </div>
-                          ) : (
-                            <p className="text-xs text-gray-400 mt-2 italic">بدون خرید</p>
-                          )}
-
+                          {/* وضعیت خرید */}
+                          <div className="mt-2 flex items-center gap-2">
+                            {lastSale ? (
+                              <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded font-medium">
+                                آخرین خرید: {formatPrice(lastSale.amount)} تومان 
+                                <span className="mx-1 opacity-50">|</span> 
+                                {lastSale.startDate ? lastSale.startDate.toLocaleDateString('fa-IR') : ''}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">هنوز خریدی نداشته</span>
+                            )}
+                          </div>
+                          
                           {customer.description && (
-                            <p className="text-xs text-gray-500 mt-2 line-clamp-1 opacity-70">
-                              {customer.description}
-                            </p>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{customer.description}</p>
                           )}
                         </div>
 
-                        {/* دکمه‌ها */}
-                        <div className="flex items-center gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 mt-2 sm:mt-0 justify-end">
+                        {/* دکمه‌های عملیات */}
+                        <div className="flex flex-wrap items-center justify-end gap-2 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0">
                            
-                           {/* دکمه دانلود فاکتور */}
+                           {/* ۱. ویرایش */}
+                           <EditCustomerDialog customer={customer} />
+
+                           {/* ۲. حذف */}
+                           <form action={deleteCustomer}>
+                             <input type="hidden" name="id" value={customer.id} />
+                             <Button 
+                               variant="ghost" 
+                               size="icon" 
+                               type="submit" 
+                               className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                               title="حذف مشتری"
+                             >
+                               <Trash2 size={18} />
+                             </Button>
+                           </form>
+
+                           {/* خط جداکننده */}
+                           <div className="w-[1px] h-6 bg-gray-200 mx-1 hidden sm:block"></div>
+
+                           {/* ۳. دانلود فاکتور */}
                            {lastSale && (
                              <InvoiceButton 
                                data={{
@@ -172,7 +194,7 @@ export default async function HomePage() {
                              />
                            )}
 
-                           {/* دکمه ثبت فروش */}
+                           {/* ۴. ثبت فروش جدید */}
                            <SaleDialog 
                               customerId={customer.id} 
                               customerName={customer.name} 
