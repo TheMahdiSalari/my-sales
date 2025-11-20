@@ -2,7 +2,7 @@ import { createCustomer } from '@/lib/actions';
 import { db } from '@/lib/db';
 import { customers, sales } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
-import { UserButton } from "@clerk/nextjs"; 
+// UserButton مستقیم حذف شد و با UserButtonToggle جایگزین شد
 
 // --- Components ---
 import { MonthFilter } from '@/components/MonthFilter';
@@ -10,6 +10,7 @@ import { CustomerList } from '@/components/CustomerList';
 import { RevenueChart } from '@/components/RevenueChart';
 import { ExcelExportButton } from '@/components/ExcelExportButton';
 import { ModeToggle } from '@/components/ModeToggle';
+import { UserButtonToggle } from '@/components/UserButtonToggle'; // کامپوننت اصلاح شده Clerk برای Dark Mode
 
 // --- UI ---
 import { Button } from '@/components/ui/button';
@@ -26,13 +27,16 @@ type Props = {
 
 export default async function HomePage({ searchParams }: Props) {
   
+  // 1. لاجیک Next.js 16: خواندن پارامترهای URL
   const params = await searchParams;
   const currentMonthStr = new Date().toLocaleDateString('fa-IR-u-nu-latn').split('/')[1];
   const selectedMonth = (params.month as string) || currentMonthStr;
 
+  // 2. دریافت داده‌ها از دیتابیس
   const allCustomers = await db.select().from(customers).orderBy(desc(customers.createdAt));
   const allSales = await db.select().from(sales).orderBy(desc(sales.startDate));
 
+  // 3. فیلتر کردن فروش‌ها بر اساس ماه انتخاب شده
   const monthlySales = allSales.filter(sale => {
     if (!sale.startDate) return false;
     const saleMonth = sale.startDate.toLocaleDateString('fa-IR-u-nu-latn').split('/')[1];
@@ -51,16 +55,7 @@ export default async function HomePage({ searchParams }: Props) {
         {/* --- Header --- */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border dark:border-gray-800">
           <div className="flex items-center gap-4">
-             {/* اصلاح رنگ متن یوزر برای حالت دارک */}
-             <UserButton 
-               showName 
-               appearance={{
-                 elements: {
-                   userButtonOuterIdentifier: "text-gray-900 dark:text-white font-bold text-base"
-                 }
-               }}
-             />
-             
+             <UserButtonToggle /> {/* دکمه کاربری با تم اصلاح شده */}
              <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-700 hidden md:block"></div>
              <h1 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100">پنل مدیریت فروش</h1>
           </div>
@@ -103,7 +98,7 @@ export default async function HomePage({ searchParams }: Props) {
           </Card>
         </div>
 
-        {/* --- Form & Chart --- */}
+        {/* --- Form & Chart (2/3 نمودار - 1/3 فرم) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
           
           {/* 1. فرم ثبت مشتری (سمت راست - 1 قسمت) */}
