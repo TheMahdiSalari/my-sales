@@ -6,7 +6,6 @@ export function MonthFilter() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // گرفتن ماه انتخابی از URL یا استفاده از ماه جاری شمسی
   const currentMonthIndex = new Date().toLocaleDateString('fa-IR-u-nu-latn').split('/')[1];
   const selectedMonth = searchParams.get('month') || currentMonthIndex;
 
@@ -26,13 +25,12 @@ export function MonthFilter() {
   ];
 
   return (
-    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm">
-      <span className="text-sm text-gray-500 font-bold mr-2">📊 مشاهده آمار:</span>
+    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-lg border dark:border-gray-700 shadow-sm transition-colors">
+      <span className="text-sm text-gray-500 dark:text-gray-400 font-bold mr-2">📊 مشاهده آمار:</span>
       <select 
-        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none"
+        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none cursor-pointer"
         value={selectedMonth}
         onChange={(e) => {
-          // وقتی ماه عوض شد، آدرس صفحه رو آپدیت کن (مثلا: /?month=9)
           router.push(`/?month=${e.target.value}`);
         }}
       >
